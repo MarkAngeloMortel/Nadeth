@@ -178,6 +178,10 @@
 
   // ---------- grade checker (contact section) ----------
   var GRADE_API = 'http://class-grades-it.mywebcommunity.org/grades_api.php/';
+  // Browsers block direct calls to the grades server (no CORS headers / plain http).
+  // Deploy grades-proxy-worker.js (see README-grades.md) and paste its URL here,
+  // e.g. 'https://grades-proxy.yourname.workers.dev/'. Leave '' to call the API directly.
+  var GRADE_PROXY = '';
   var gradeForm = document.getElementById('gradeForm');
   if(gradeForm){
     var gradeId = document.getElementById('gradeId');
@@ -267,8 +271,8 @@
       }
 
       // An https page can't call a plain-http API (mixed content), so upgrade when needed.
-      var base = GRADE_API;
-      if(location.protocol === 'https:') base = base.replace(/^http:/, 'https:');
+      var base = GRADE_PROXY || GRADE_API;
+      if(!GRADE_PROXY && location.protocol === 'https:') base = base.replace(/^http:/, 'https:');
       var url = base + '?' + new URLSearchParams({ id: id, lastName: last }).toString();
 
       setBusy(true);
