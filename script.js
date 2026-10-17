@@ -175,4 +175,140 @@
     });
   }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
   revealEls.forEach(function(el){ revealObserver.observe(el); });
+
+  // ---------- grade checker (contact section) ----------
+  var GRADE_API = 'http://class-grades-it.mywebcommunity.org/grades_api.php/';
+  var gradeForm = document.getElementById('gradeForm');
+  if(gradeForm){
+    var gradeId = document.getElementById('gradeId');
+    var gradeName = document.getElementById('gradeName');
+    var gradeSubmit = document.getElementById('gradeSubmit');
+    var gradeClear = document.getElementById('gradeClear');
+    var gradeResult = document.getElementById('gradeResult');
+    var gradeBusy = false;
+
+    function prettyKey(k){
+      return String(k).replace(/[_-]/g, ' ').trim().replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+    }
+    function el(tag, cls, text){
+      var n = document.createElement(tag);
+      if(cls) n.className = cls;
+      if(text !== undefined) n.textContent = text;
+      return n;
+    }
+    // Build DOM from the API's JSON using textContent only (never innerHTML),
+    // so nothing returned by the server can inject markup.
+    function renderData(data, parent){
+      if(Array.isArray(data)){
+        data.forEach(function(item, i){
+          if(item !== null && typeof item === 'object'){
+            if(i) parent.appendChild(el('hr', 'grade-sep'));
+            renderData(item, parent);
+          } else {
+            var li = el('div', 'grade-row');
+            li.appendChild(el('span', 'grade-bullet', '\u2022'));
+            li.appendChild(el('span', 'grade-v', String(item)));
+            parent.appendChild(li);
+          }
+        });
+      } else if(data !== null && typeof data === 'object'){
+        Object.keys(data).forEach(function(k){
+          var v = data[k];
+          if(v !== null && typeof v === 'object'){
+            parent.appendChild(el('div', 'grade-k grade-group', prettyKey(k)));
+            var inner = el('div', 'grade-nested');
+            renderData(v, inner);
+            parent.appendChild(inner);
+          } else {
+            var row = el('div', 'grade-row');
+            row.appendChild(el('span', 'grade-k', prettyKey(k)));
+            row.appendChild(el('span', 'grade-v', v === null ? '\u2014' : String(v)));
+            parent.appendChild(row);
+          }
+        });
+      } else {
+        parent.appendChild(el('div', 'grade-v', String(data)));
+      }
+    }
+    function showResult(node){
+      gradeResult.textContent = '';
+      gradeResult.appendChild(node);
+    }
+    function showMuted(msg){ showResult(el('p', 'grade-muted', msg)); }
+    function showError(msg, detail){
+      var wrap = el('div', 'grade-error');
+      wrap.appendChild(el('strong', null, msg));
+      if(detail) wrap.appendChild(el('p', 'grade-muted', detail));
+      showResult(wrap);
+    }
+    function setBusy(b){
+      gradeBusy = b;
+      gradeSubmit.disabled = b;
+      gradeSubmit.classList.toggle('loading', b);
+      gradeSubmit.textContent = b ? 'Checking\u2026' : 'Check Grade';
+      gradeResult.setAttribute('aria-busy', b ? 'true' : 'false');
+      if(b){
+        var wait = el('div', 'grade-loading');
+        wait.appendChild(el('span', 'grade-spin'));
+        wait.appendChild(el('span', null, 'Fetching grade\u2026'));
+        showResult(wait);
+      }
+    }
+
+    gradeForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      if(gradeBusy) return;
+      var id = gradeId.value.trim();
+      var last = gradeName.value.trim();
+      if(!id || !last){
+        showError('Missing information', 'Please enter both your ID number and last name.');
+        (id ? gradeName : gradeId).focus();
+        return;
+      }
+
+      // An https page can't call a plain-http API (mixed content), so upgrade when needed.
+      var base = GRADE_API;
+      if(location.protocol === 'https:') base = base.replace(/^http:/, 'https:');
+      var url = base + '?' + new URLSearchParams({ id: id, lastName: last }).toString();
+
+      setBusy(true);
+      var ctrl = ('AbortController' in window) ? new AbortController() : null;
+      var timer = setTimeout(function(){ if(ctrl) ctrl.abort(); }, 15000);
+
+      fetch(url, ctrl ? { signal: ctrl.signal } : undefined)
+        .then(function(res){
+          if(!res.ok) throw new Error('HTTP ' + res.status + (res.statusText ? ' ' + res.statusText : ''));
+          return res.text();
+        })
+        .then(function(text){
+          clearTimeout(timer);
+          setBusy(false);
+          var box = el('div', 'grade-data');
+          var parsed;
+          try{ parsed = JSON.parse(text); }catch(err){ parsed = undefined; }
+          if(parsed === undefined){
+            box.appendChild(el('div', 'grade-v', text.trim() || 'No data returned.'));
+          } else {
+            renderData(parsed, box);
+          }
+          showResult(box);
+        })
+        .catch(function(err){
+          clearTimeout(timer);
+          setBusy(false);
+          var timedOut = err && err.name === 'AbortError';
+          showError('Could not fetch grade.',
+            timedOut ? 'The request timed out. Please try again.'
+                     : 'The grades server could not be reached or blocked the request (' + (err && err.message ? err.message : 'network error') + ').');
+        });
+    });
+
+    gradeClear.addEventListener('click', function(){
+      if(gradeBusy) return;
+      gradeId.value = '';
+      gradeName.value = '';
+      showMuted('Your grade will appear here.');
+      gradeId.focus();
+    });
+  }
 })();

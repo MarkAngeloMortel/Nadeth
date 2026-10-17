@@ -247,6 +247,31 @@
         </div>
       </a>
     </div>
+
+    <!-- GRADE CHECKER -->
+    <div class="panel grade-panel reveal" id="grades">
+      <div class="grade-head">
+        <h4>Check your grade</h4>
+        <p>Enter your ID number and last name to look up your class grade.</p>
+      </div>
+      <form class="grade-form" id="gradeForm" novalidate>
+        <label class="grade-field">
+          <span>ID Number</span>
+          <input type="text" id="gradeId" name="id" inputmode="numeric" autocomplete="off" placeholder="e.g. 2024-0001">
+        </label>
+        <label class="grade-field">
+          <span>Last Name</span>
+          <input type="text" id="gradeName" name="lastName" autocomplete="family-name" placeholder="e.g. Dela Cruz">
+        </label>
+        <div class="grade-actions">
+          <button type="submit" class="btn btn-primary" id="gradeSubmit">Check Grade</button>
+          <button type="button" class="btn btn-ghost" id="gradeClear">Clear</button>
+        </div>
+      </form>
+      <div class="grade-result" id="gradeResult" role="status" aria-live="polite">
+        <p class="grade-muted">Your grade will appear here.</p>
+      </div>
+    </div>
   </div>
 </section>
 </main>
